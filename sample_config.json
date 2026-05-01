@@ -1,0 +1,26 @@
+{
+  "predict_time": "20:00",
+  "post_draw_time": "22:00",
+  "timezone_note": "Use the host machine local timezone.",
+  "history_limit": 220,
+  "candidate_count": 20,
+  "backtest_window": 60,
+  "request_timeout_seconds": 15,
+  "user_agent": "Mozilla/5.0 lottery-statistics-bot/1.0",
+  "lotteries": ["fc3d", "pls", "plw"],
+  "weights": {
+    "frequency": 0.34,
+    "recency": 0.28,
+    "omission": 0.22,
+    "transition": 0.16
+  },
+  "model_weights": {
+    "legacy": 0.30,
+    "markov": 0.30,
+    "bayes": 0.24,
+    "shape": 0.16
+  },
+  "signal_weight": 0.18,
+  "web_refresh_predict_minutes": 0,
+  "web_refresh_post_draw_always": true
+}

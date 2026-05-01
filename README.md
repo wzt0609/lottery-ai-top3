@@ -1,535 +1,105 @@
-# aaa
-多 Agent 自动化系统
-import os
-import re
-import json
-import shutil
-import subprocess
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from openai import OpenAI
-
-
-# =========================
-# 1. 基础配置
-# =========================
-
-load_dotenv()
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-WORKSPACE_DIR = Path(os.getenv("WORKSPACE_DIR", "./workspace")).resolve()
-
-if not OPENAI_API_KEY:
-    raise RuntimeError("请先在 .env 中配置 OPENAI_API_KEY")
-
-WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
-
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-app = FastAPI(
-    title="Multi-Agent Dev Automation System",
-    description="一个多 Agent 自动化研发系统：需求分析、代码生成、测试、审查、文档总结。",
-    version="1.0.0",
-)
-
-
-# =========================
-# 2. 请求与响应模型
-# =========================
-
-class DevTaskRequest(BaseModel):
-    task: str = Field(..., description="用户提出的研发任务，例如：为项目增加登录接口")
-    max_rounds: int = Field(default=2, ge=1, le=5, description="最多自动修复轮数")
-    run_tests: bool = Field(default=True, description="是否自动执行测试")
-
-
-class AgentMessage(BaseModel):
-    agent: str
-    content: Any
-
-
-class DevTaskResponse(BaseModel):
-    task: str
-    success: bool
-    rounds: int
-    messages: List[AgentMessage]
-    changed_files: List[str]
-    test_output: Optional[str] = None
-    review_result: Optional[Dict[str, Any]] = None
-    summary: Optional[str] = None
-
-
-# =========================
-# 3. 文件系统安全工具
-# =========================
-
-def safe_path(relative_path: str) -> Path:
-    """
-    防止 Agent 写出 workspace 目录。
-    """
-    path = (WORKSPACE_DIR / relative_path).resolve()
-    if not str(path).startswith(str(WORKSPACE_DIR)):
-        raise ValueError(f"非法路径：{relative_path}")
-    return path
-
-
-def list_workspace_files() -> List[str]:
-    files = []
-    for path in WORKSPACE_DIR.rglob("*"):
-        if path.is_file():
-            files.append(str(path.relative_to(WORKSPACE_DIR)))
-    return sorted(files)
-
-
-def read_file(relative_path: str) -> str:
-    path = safe_path(relative_path)
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8")
-
-
-def write_file(relative_path: str, content: str) -> None:
-    path = safe_path(relative_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-
-
-def snapshot_workspace() -> Dict[str, str]:
-    """
-    将当前 workspace 中的文本文件读入上下文。
-    为了避免上下文过大，这里限制单文件最大 12000 字符。
-    """
-    result = {}
-    for file in list_workspace_files():
-        try:
-            content = read_file(file)
-            result[file] = content[:12000]
-        except UnicodeDecodeError:
-            result[file] = "[二进制文件，已跳过]"
-    return result
-
-
-def run_tests_in_workspace() -> str:
-    """
-    自动执行测试。
-    优先 pytest；如果没有 pytest，就做一次 Python 编译检查。
-    """
-    if not WORKSPACE_DIR.exists():
-        return "workspace 不存在"
-
-    pytest_exists = shutil.which("pytest") is not None
-
-    if pytest_exists:
-        cmd = ["pytest", "-q"]
-    else:
-        cmd = ["python", "-m", "compileall", "."]
-
-    try:
-        completed = subprocess.run(
-            cmd,
-            cwd=str(WORKSPACE_DIR),
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        output = (
-            f"$ {' '.join(cmd)}\n\n"
-            f"exit_code={completed.returncode}\n\n"
-            f"STDOUT:\n{completed.stdout}\n\n"
-            f"STDERR:\n{completed.stderr}"
-        )
-        return output
-    except subprocess.TimeoutExpired:
-        return "测试执行超时，已终止。"
-
-
-# =========================
-# 4. 通用 LLM Agent 基类
-# =========================
-
-class SimpleAgent:
-    def __init__(self, name: str, system_prompt: str):
-        self.name = name
-        self.system_prompt = system_prompt
-
-    def run(self, user_prompt: str, temperature: float = 0.2) -> str:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            temperature=temperature,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        return response.choices[0].message.content or ""
-
-
-def extract_json(text: str) -> Any:
-    """
-    尽量从模型输出中提取 JSON。
-    支持：
-    1. 纯 JSON
-    2. ```json ... ```
-    3. 文本中夹杂 JSON
-    """
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-    except Exception:
-        pass
-
-    code_block = re.search(r"```json\s*(.*?)```", text, re.S)
-    if code_block:
-        try:
-            return json.loads(code_block.group(1).strip())
-        except Exception:
-            pass
-
-    json_like = re.search(r"(\{.*\}|\[.*\])", text, re.S)
-    if json_like:
-        try:
-            return json.loads(json_like.group(1))
-        except Exception:
-            pass
-
-    raise ValueError(f"无法解析 JSON：\n{text}")
-
-
-# =========================
-# 5. 多 Agent 定义
-# =========================
-
-planner_agent = SimpleAgent(
-    name="需求分析 Agent",
-    system_prompt="""
-你是一个资深软件架构师，负责把用户需求拆解成清晰的开发计划。
-你必须输出 JSON，不要输出多余解释。
-
-输出格式：
-{
-  "goal": "本次开发目标",
-  "assumptions": ["必要假设"],
-  "steps": ["开发步骤1", "开发步骤2"],
-  "files_to_change": ["可能需要修改或新增的文件"],
-  "test_strategy": "测试策略",
-  "risk_points": ["潜在风险"]
-}
-"""
-)
-
-coder_agent = SimpleAgent(
-    name="代码生成 Agent",
-    system_prompt="""
-你是一个严谨的 Python 全栈开发工程师，负责根据需求和当前仓库内容生成代码修改。
-你必须输出 JSON，不要输出多余解释。
-
-你只能通过 files 数组返回要写入的文件。
-不要删除用户没有要求删除的内容。
-如果是修改文件，请返回修改后的完整文件内容，而不是 diff。
-
-输出格式：
-{
-  "explanation": "简要说明做了什么",
-  "files": [
-    {
-      "path": "相对 workspace 的路径，例如 src/main.py",
-      "content": "完整文件内容"
-    }
-  ]
-}
-"""
-)
-
-reviewer_agent = SimpleAgent(
-    name="代码审查 Agent",
-    system_prompt="""
-你是一个严格的代码审查专家，负责检查代码质量、安全性、可维护性和测试结果。
-你必须输出 JSON，不要输出多余解释。
-
-输出格式：
-{
-  "approved": true,
-  "score": 0到100之间的整数,
-  "issues": [
-    {
-      "level": "blocker|major|minor",
-      "file": "相关文件",
-      "problem": "问题说明",
-      "suggestion": "修复建议"
-    }
-  ],
-  "final_comment": "总体评价"
-}
-"""
-)
-
-fixer_agent = SimpleAgent(
-    name="自动修复 Agent",
-    system_prompt="""
-你是一个自动修复 Agent，负责根据测试失败信息和代码审查意见修复代码。
-你必须输出 JSON，不要输出多余解释。
-
-输出格式：
-{
-  "explanation": "简要说明修复了什么",
-  "files": [
-    {
-      "path": "相对 workspace 的路径",
-      "content": "修复后的完整文件内容"
-    }
-  ]
-}
-"""
-)
-
-document_agent = SimpleAgent(
-    name="文档总结 Agent",
-    system_prompt="""
-你是技术文档工程师，负责把本次多 Agent 自动开发过程总结成清晰的中文说明。
-要求：
-1. 说明完成了什么
-2. 说明修改了哪些文件
-3. 说明测试结果
-4. 说明代码审查结论
-5. 给出后续优化建议
-
-请直接输出中文 Markdown。
-"""
-)
-
-
-# =========================
-# 6. Orchestrator 编排器
-# =========================
-
-class MultiAgentOrchestrator:
-    def __init__(self):
-        self.messages: List[AgentMessage] = []
-        self.changed_files: List[str] = []
-
-    def add_message(self, agent: str, content: Any):
-        self.messages.append(AgentMessage(agent=agent, content=content))
-
-    def apply_file_changes(self, files: List[Dict[str, str]]):
-        for item in files:
-            path = item.get("path")
-            content = item.get("content")
-            if not path or content is None:
-                continue
-            write_file(path, content)
-            if path not in self.changed_files:
-                self.changed_files.append(path)
-
-    def run(self, task: str, max_rounds: int = 2, should_run_tests: bool = True) -> DevTaskResponse:
-        # Step 1: 需求分析
-        repo_snapshot = snapshot_workspace()
-
-        plan_prompt = f"""
-用户需求：
-{task}
-
-当前仓库文件：
-{json.dumps(repo_snapshot, ensure_ascii=False, indent=2)}
-"""
-        plan_text = planner_agent.run(plan_prompt)
-        plan = extract_json(plan_text)
-        self.add_message(planner_agent.name, plan)
-
-        # Step 2: 代码生成
-        code_prompt = f"""
-用户需求：
-{task}
-
-开发计划：
-{json.dumps(plan, ensure_ascii=False, indent=2)}
-
-当前仓库内容：
-{json.dumps(repo_snapshot, ensure_ascii=False, indent=2)}
-
-请生成代码修改。
-"""
-        code_text = coder_agent.run(code_prompt)
-        code_result = extract_json(code_text)
-        self.add_message(coder_agent.name, code_result)
-
-        self.apply_file_changes(code_result.get("files", []))
-
-        test_output = None
-        review_result = None
-        success = False
-        rounds_used = 1
-
-        # Step 3: 测试 + 审查 + 自动修复循环
-        for round_idx in range(1, max_rounds + 1):
-            rounds_used = round_idx
-
-            current_snapshot = snapshot_workspace()
-
-            if should_run_tests:
-                test_output = run_tests_in_workspace()
-            else:
-                test_output = "用户选择跳过测试。"
-
-            self.add_message("测试执行 Agent", test_output)
-
-            review_prompt = f"""
-用户需求：
-{task}
-
-开发计划：
-{json.dumps(plan, ensure_ascii=False, indent=2)}
-
-当前仓库内容：
-{json.dumps(current_snapshot, ensure_ascii=False, indent=2)}
-
-测试输出：
-{test_output}
-
-请进行代码审查。
-"""
-            review_text = reviewer_agent.run(review_prompt)
-            review_result = extract_json(review_text)
-            self.add_message(reviewer_agent.name, review_result)
-
-            approved = bool(review_result.get("approved"))
-            score = int(review_result.get("score", 0))
-
-            if approved and score >= 80:
-                success = True
-                break
-
-            if round_idx >= max_rounds:
-                break
-
-            # Step 4: 自动修复
-            fix_prompt = f"""
-用户需求：
-{task}
-
-当前仓库内容：
-{json.dumps(current_snapshot, ensure_ascii=False, indent=2)}
-
-测试输出：
-{test_output}
-
-代码审查结果：
-{json.dumps(review_result, ensure_ascii=False, indent=2)}
-
-请修复问题，返回需要修改的完整文件。
-"""
-            fix_text = fixer_agent.run(fix_prompt)
-            fix_result = extract_json(fix_text)
-            self.add_message(fixer_agent.name, fix_result)
-
-            self.apply_file_changes(fix_result.get("files", []))
-
-        # Step 5: 文档总结
-        summary_prompt = f"""
-用户需求：
-{task}
-
-变更文件：
-{json.dumps(self.changed_files, ensure_ascii=False, indent=2)}
-
-测试输出：
-{test_output}
-
-代码审查结果：
-{json.dumps(review_result, ensure_ascii=False, indent=2)}
-
-全部 Agent 消息：
-{json.dumps([m.model_dump() for m in self.messages], ensure_ascii=False, indent=2)}
-"""
-        summary = document_agent.run(summary_prompt, temperature=0.3)
-        self.add_message(document_agent.name, summary)
-
-        return DevTaskResponse(
-            task=task,
-            success=success,
-            rounds=rounds_used,
-            messages=self.messages,
-            changed_files=self.changed_files,
-            test_output=test_output,
-            review_result=review_result,
-            summary=summary,
-        )
-
-
-# =========================
-# 7. API 路由
-# =========================
-
-@app.get("/")
-def root():
-    return {
-        "message": "Multi-Agent Dev Automation System is running.",
-        "workspace": str(WORKSPACE_DIR),
-        "model": OPENAI_MODEL,
-        "endpoints": {
-            "run_task": "POST /tasks/run",
-            "files": "GET /workspace/files",
-            "read_file": "GET /workspace/files/{path}",
-        },
-    }
-
-
-@app.get("/workspace/files")
-def get_workspace_files():
-    return {
-        "workspace": str(WORKSPACE_DIR),
-        "files": list_workspace_files(),
-    }
-
-
-@app.get("/workspace/files/{file_path:path}")
-def get_workspace_file(file_path: str):
-    try:
-        return {
-            "path": file_path,
-            "content": read_file(file_path),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/tasks/run", response_model=DevTaskResponse)
-def run_dev_task(request: DevTaskRequest):
-    try:
-        orchestrator = MultiAgentOrchestrator()
-        return orchestrator.run(
-            task=request.task,
-            max_rounds=request.max_rounds,
-            should_run_tests=request.run_tests,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# =========================
-# 8. 本地命令行运行
-# =========================
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Run multi-agent dev task from CLI.")
-    parser.add_argument("task", type=str, help="研发任务描述")
-    parser.add_argument("--rounds", type=int, default=2, help="最大修复轮数")
-    parser.add_argument("--no-tests", action="store_true", help="跳过测试")
-
-    args = parser.parse_args()
-
-    orchestrator = MultiAgentOrchestrator()
-    result = orchestrator.run(
-        task=args.task,
-        max_rounds=args.rounds,
-        should_run_tests=not args.no_tests,
-    )
-
-    print(json.dumps(result.model_dump(), ensure_ascii=False, indent=2))
+# 中国福利彩票 3D / 体彩排列三排列五统计预测工具
+
+这是一个每天自动检索开奖数据、生成统计候选号码、并在开奖后做复盘优化的小程序。
+
+重要说明：彩票开奖结果具有随机性，本工具只做历史统计、候选组合记录和复盘，不保证中奖，也不构成投注建议。
+
+## 功能
+
+- 每天 20:00 生成中国福利彩票 3D、中国体育彩票排列三、排列五的统计预测报告。
+- 每天开奖后默认 22:00 再次抓取开奖结果，复盘当天候选号码表现。
+- 手机刷新 `mobile.html` 时会触发实时检查：预测数据超过配置间隔会重新抓取生成；22:00 后还会自动尝试开奖复盘。
+- 自动保存历史开奖数据到 `data/`。
+- 自动保存预测报告和开奖后复盘到 `reports/`。
+- 根据最近回测表现调整下一轮统计权重。
+- 数据源包含 17500 历史文本数据、中国福彩网、中国体彩网/国家彩票平台页面或接口。
+- 候选评分纳入走势图常见形态：位置热度、近期性、遗漏、相邻期转移、和值、和值尾、跨度、奇偶比、大小比、012 路分布。
+
+## 快速运行
+
+```powershell
+python .\lottery_predictor.py init
+python .\lottery_predictor.py collect
+python .\lottery_predictor.py predict
+python .\lottery_predictor.py post-draw
+```
+
+运行后查看：
+
+- `data/*.csv`：历史开奖数据
+- `reports/prediction-YYYY-MM-DD.md`：每日预测报告
+- `reports/post-draw-YYYY-MM-DD.md`：开奖后复盘
+- `reports/mobile.html`：手机友好的每日最高评分 3 码页面
+- `config.json`：时间、候选数量、统计权重等配置
+
+## 手机查看链接
+
+每天执行 `predict` 后会自动刷新 `reports/mobile.html`，页面只突出显示：
+
+- 3 个福彩 3D 号码
+- 3 个排列三号码
+- 3 个排列五号码
+
+在电脑上启动手机页面服务：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_mobile_server.ps1
+```
+
+控制台会输出类似下面的链接：
+
+```text
+Phone on the same Wi-Fi: http://192.168.1.23:8765/mobile.html
+```
+
+手机和电脑连接同一个 Wi-Fi 后，用手机浏览器打开这个链接即可。
+
+## 长期运行方式一：后台常驻
+
+```powershell
+python .\lottery_predictor.py daemon
+```
+
+程序会按 `config.json` 中的 `predict_time` 和 `post_draw_time` 执行。
+
+## 长期运行方式二：Windows 任务计划程序
+
+先用管理员或当前用户 PowerShell 执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup_windows_tasks.ps1
+```
+
+它会创建两个任务：
+
+- `LotteryPredictor-DailyPredict`：每天 20:00 运行预测
+- `LotteryPredictor-PostDraw`：每天 22:00 运行开奖后复盘
+
+如果你的地区开奖公布时间有延迟，可以修改 `config.json` 中的 `post_draw_time`，并重新运行任务安装脚本。
+
+## 配置项
+
+`config.json` 会在第一次运行时自动生成，常用字段：
+
+- `predict_time`：每日预测时间，默认 `20:00`
+- `post_draw_time`：开奖后复盘时间，默认 `22:00`
+- `candidate_count`：每种彩票输出候选号码数量
+- `history_limit`：本地保留多少期历史数据
+- `weights`：频率、近期性、遗漏、转移统计的组合权重
+- `web_refresh_predict_minutes`：手机页面刷新触发预测重算的最小间隔，默认 0，表示每次刷新都强制重算。
+- `web_refresh_post_draw_always`：默认开启，表示每次刷新手机页面都会尝试开奖复盘，然后再生成预测页。
+
+## 数据来源
+
+程序会尝试使用 17500 历史文本数据、中国福利彩票官网、中国体彩网/国家彩票平台公开开奖页面或接口；如果网站结构调整导致抓取失败，会使用本地已缓存历史数据继续生成报告，并在控制台提示错误。
+
+## 优化逻辑
+
+每天开奖后执行 `post-draw` 时，程序会：
+
+1. 重新抓取最新开奖结果。
+2. 对当天预测候选做位置命中和完整命中复盘。
+3. 用最近若干期做滚动回测，选择表现较好的统计权重。
+4. 把下一轮权重写回 `config.json`。
+
+这些优化只能让报告更贴近历史统计特征，不能消除开奖随机性。
