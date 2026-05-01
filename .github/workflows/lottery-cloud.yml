@@ -1,0 +1,45 @@
+name: Lottery Cloud Update
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Beijing 20:05
+    - cron: "5 12 * * *"
+    # Beijing 22:05
+    - cron: "5 14 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lottery-cloud-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run cloud update
+        run: python lottery_predictor.py cloud
+
+      - name: Commit generated site and data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data reports docs config.json
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+          else
+            git commit -m "Update lottery prediction site"
+            git push
+          fi
