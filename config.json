@@ -18,7 +18,33 @@
     "omission": 0.22,
     "transition": 0.16
   },
+  "model_weights": {
+    "legacy": 0.30,
+    "markov": 0.30,
+    "bayes": 0.24,
+    "shape": 0.16
+  },
   "signal_weight": 0.18,
+  "expert_signal_weight": 0.06,
+  "expert_sources": {
+    "fc3d": [
+      {
+        "name": "17500 钱王点评",
+        "url": "https://www.17500.cn/search/457.html"
+      },
+      {
+        "name": "17500 孟庆会一语定胆",
+        "url": "https://www.17500.cn/search/921.html"
+      }
+    ],
+    "pls": [],
+    "plw": [
+      {
+        "name": "17500 排列五专家杀码",
+        "url": "https://www.17500.cn/search/?wd=%E6%8E%92%E5%88%97%E4%BA%94%20%E6%9D%80%E4%B8%80%E7%A0%81"
+      }
+    ]
+  },
   "web_refresh_predict_minutes": 0,
   "web_refresh_post_draw_always": true
 }

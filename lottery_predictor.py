@@ -137,6 +137,26 @@ DEFAULT_CONFIG = {
         "shape": 0.16
     },
     "signal_weight": 0.18,
+    "expert_signal_weight": 0.06,
+    "expert_sources": {
+        "fc3d": [
+            {
+                "name": "17500 钱王点评",
+                "url": "https://www.17500.cn/search/457.html"
+            },
+            {
+                "name": "17500 孟庆会一语定胆",
+                "url": "https://www.17500.cn/search/921.html"
+            }
+        ],
+        "pls": [],
+        "plw": [
+            {
+                "name": "17500 排列五专家杀码",
+                "url": "https://www.17500.cn/search/?wd=%E6%8E%92%E5%88%97%E4%BA%94%20%E6%9D%80%E4%B8%80%E7%A0%81"
+            }
+        ]
+    },
     "web_refresh_predict_minutes": 0,
     "web_refresh_post_draw_always": True,
 }
@@ -227,6 +247,7 @@ def load_config() -> dict[str, Any]:
     merged.update(config)
     merged["weights"] = {**DEFAULT_CONFIG["weights"], **config.get("weights", {})}
     merged["model_weights"] = {**DEFAULT_CONFIG["model_weights"], **config.get("model_weights", {})}
+    merged["expert_sources"] = {**DEFAULT_CONFIG["expert_sources"], **config.get("expert_sources", {})}
     return merged
 
 
@@ -646,12 +667,12 @@ def log_position_prob(numbers: tuple[int, ...], probs: list[list[float]]) -> flo
     return sum(math.log(safe_prob(probs[pos][n])) for pos, n in enumerate(numbers))
 
 
-def ensemble_components(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None) -> dict[str, float]:
+def ensemble_components(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None, expert: dict[str, Any] | None = None) -> dict[str, float]:
     digits = len(numbers)
     bayes_probs = bayes_position_probs(draws, digits)
     markov_probs = markov_position_probs(draws, digits)
     shape = shape_model(draws)
-    legacy = candidate_score(numbers, stats, draws, signal)
+    legacy = candidate_score(numbers, stats, draws, signal, expert)
     markov = log_position_prob(numbers, markov_probs)
     bayes = log_position_prob(numbers, bayes_probs)
     shape_score = math.log(safe_prob(shape_probability(numbers, shape)))
@@ -673,7 +694,7 @@ def ensemble_score(components: dict[str, float], model_weights: dict[str, float]
     return total / max(weight_sum, 1e-9)
 
 
-def candidate_score(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None) -> float:
+def candidate_score(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None, expert: dict[str, Any] | None = None) -> float:
     score = 0.0
     for pos, n in enumerate(numbers):
         score += math.log(stats[pos][n] + 1e-9)
@@ -689,6 +710,8 @@ def candidate_score(numbers: tuple[int, ...], stats: list[list[float]], draws: l
         score += trend_shape_bonus(numbers, recent)
     if signal:
         score += signal_bonus(numbers, signal)
+    if expert:
+        score += expert_bonus(numbers, expert)
     repeat_penalty = len(numbers) - len(set(numbers))
     return score - repeat_penalty * 0.08
 
@@ -704,6 +727,25 @@ def signal_bonus(numbers: tuple[int, ...], signal: dict[str, Any]) -> float:
         pos_hits = sum(1 for a, b in zip(numbers, comparable) if a == b)
         overlap = len(set(numbers) & set(comparable))
         bonus += weight * field_weight * (pos_hits * 0.9 + overlap * 0.25)
+    return bonus
+
+
+def expert_bonus(numbers: tuple[int, ...], expert: dict[str, Any]) -> float:
+    weight = float(expert.get("weight", DEFAULT_CONFIG["expert_signal_weight"]))
+    flat = set(numbers)
+    hot_digits = set(expert.get("hot_digits", []))
+    kill_digits = set(expert.get("kill_digits", []))
+    banker_digits = set(expert.get("banker_digits", []))
+    sum_ranges = expert.get("sum_ranges", [])
+    span_values = set(expert.get("span_values", []))
+    bonus = 0.0
+    bonus += weight * 0.45 * len(flat & banker_digits)
+    bonus += weight * 0.22 * len(flat & hot_digits)
+    bonus -= weight * 0.42 * len(flat & kill_digits)
+    if any(low <= sum(numbers) <= high for low, high in sum_ranges):
+        bonus += weight * 0.5
+    if span_values and (max(numbers) - min(numbers)) in span_values:
+        bonus += weight * 0.28
     return bonus
 
 
@@ -808,6 +850,83 @@ def fetch_17500_signals(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return parse_17500_signals(text, float(config.get("signal_weight", DEFAULT_CONFIG["signal_weight"])))
 
 
+def fetch_expert_signals(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    all_signals: dict[str, dict[str, Any]] = {}
+    sources_by_key = config.get("expert_sources", {})
+    for lottery_key, sources in sources_by_key.items():
+        merged = {
+            "source_names": [],
+            "source_urls": [],
+            "hot_digits": [],
+            "kill_digits": [],
+            "banker_digits": [],
+            "sum_ranges": [],
+            "span_values": [],
+            "snippets": [],
+            "weight": float(config.get("expert_signal_weight", DEFAULT_CONFIG["expert_signal_weight"])),
+        }
+        for source in sources:
+            try:
+                text = fetch_text(source["url"], int(config["request_timeout_seconds"]), config["user_agent"])
+            except (urllib.error.URLError, TimeoutError, UnicodeDecodeError, KeyError):
+                continue
+            parsed = parse_expert_text(text)
+            merged["source_names"].append(source.get("name", source["url"]))
+            merged["source_urls"].append(source["url"])
+            for field in ["hot_digits", "kill_digits", "banker_digits", "span_values"]:
+                merged[field].extend(parsed[field])
+            merged["sum_ranges"].extend(parsed["sum_ranges"])
+            merged["snippets"].extend(parsed["snippets"][:3])
+        for field in ["hot_digits", "kill_digits", "banker_digits", "span_values"]:
+            merged[field] = sorted(set(int(x) for x in merged[field] if 0 <= int(x) <= 9))
+        merged["sum_ranges"] = unique_ranges(merged["sum_ranges"])
+        if merged["source_names"]:
+            all_signals[lottery_key] = merged
+    return all_signals
+
+
+def parse_expert_text(text: str) -> dict[str, Any]:
+    clean = re.sub(r"<script\b.*?</script>", " ", text, flags=re.I | re.S)
+    clean = re.sub(r"<style\b.*?</style>", " ", clean, flags=re.I | re.S)
+    clean = html.unescape(re.sub(r"<[^>]+>", " ", clean))
+    clean = " ".join(clean.split())
+    result = {
+        "hot_digits": [],
+        "kill_digits": [],
+        "banker_digits": [],
+        "sum_ranges": [],
+        "span_values": [],
+        "snippets": [],
+    }
+    keyword_windows = re.finditer(r"(胆码|独胆|金胆|双胆|拖码|配号|杀码|杀一|和值|跨度|字谜|画谜|谜语|定胆).{0,80}", clean)
+    for match in keyword_windows:
+        snippet = match.group(0)
+        result["snippets"].append(snippet[:90])
+        digits = [int(x) for x in re.findall(r"\d", snippet)]
+        if re.search(r"杀码|杀一|杀号|排除", snippet):
+            result["kill_digits"].extend(digits[:6])
+        elif re.search(r"胆码|独胆|金胆|定胆|双胆", snippet):
+            result["banker_digits"].extend(digits[:6])
+        elif re.search(r"拖码|配号|关注|防|看好", snippet):
+            result["hot_digits"].extend(digits[:8])
+        if "和值" in snippet:
+            for low, high in re.findall(r"(\d{1,2})\s*[-~—到]\s*(\d{1,2})", snippet):
+                result["sum_ranges"].append((int(low), int(high)))
+        if "跨度" in snippet:
+            result["span_values"].extend([int(x) for x in re.findall(r"\d", snippet)[:6]])
+    return result
+
+
+def unique_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    normalized = []
+    for low, high in ranges:
+        if low > high:
+            low, high = high, low
+        if 0 <= low <= 45 and 0 <= high <= 45:
+            normalized.append((low, high))
+    return sorted(set(normalized))
+
+
 def parse_17500_signals(text: str, weight: float) -> dict[str, dict[str, Any]]:
     clean = re.sub(r"<script\b.*?</script>", " ", text, flags=re.I | re.S)
     clean = re.sub(r"<style\b.*?</style>", " ", clean, flags=re.I | re.S)
@@ -860,6 +979,22 @@ def signal_for_report(signal: dict[str, Any] | None) -> dict[str, Any]:
     return result
 
 
+def expert_for_report(expert: dict[str, Any] | None) -> dict[str, Any]:
+    if not expert:
+        return {}
+    return {
+        "source_names": expert.get("source_names", []),
+        "source_urls": expert.get("source_urls", []),
+        "banker_digits": expert.get("banker_digits", []),
+        "hot_digits": expert.get("hot_digits", []),
+        "kill_digits": expert.get("kill_digits", []),
+        "sum_ranges": expert.get("sum_ranges", []),
+        "span_values": expert.get("span_values", []),
+        "snippets": expert.get("snippets", [])[:5],
+        "weight": expert.get("weight"),
+    }
+
+
 def gaussian_bonus(value: float, avg: float, sd: float) -> float:
     sd = max(sd, 1.0)
     z = (value - avg) / sd
@@ -881,6 +1016,7 @@ def generate_candidates(
     count: int,
     weights: dict[str, float],
     signal: dict[str, Any] | None = None,
+    expert: dict[str, Any] | None = None,
     model_weights: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
     stats = position_stats(draws, digits, weights)
@@ -888,7 +1024,7 @@ def generate_candidates(
     all_numbers = candidate_pool(stats, digits, draws)
     scored = []
     for numbers in all_numbers:
-        components = ensemble_components(numbers, stats, draws, signal)
+        components = ensemble_components(numbers, stats, draws, signal, expert)
         scored.append((ensemble_score(components, model_weights), numbers, components))
     scored.sort(reverse=True, key=lambda x: x[0])
     top = scored[: max(count * 5, count)]
@@ -982,6 +1118,22 @@ def evaluate_prediction(candidates: list[dict[str, Any]], actual: tuple[int, ...
     }
 
 
+def evaluate_expert_signal(expert: dict[str, Any] | None, actual: tuple[int, ...]) -> dict[str, Any]:
+    if not expert:
+        return {}
+    actual_set = set(actual)
+    banker = set(expert.get("banker_digits", []))
+    hot = set(expert.get("hot_digits", []))
+    kill = set(expert.get("kill_digits", []))
+    return {
+        "banker_hits": sorted(actual_set & banker),
+        "hot_hits": sorted(actual_set & hot),
+        "kill_misses_expected": sorted(actual_set & kill),
+        "actual": "".join(str(x) for x in actual),
+        "source_names": expert.get("source_names", []),
+    }
+
+
 def optimize_weights(draws: list[Draw], digits: int, config: dict[str, Any]) -> dict[str, float]:
     if config.get("fast") or config.get("offline"):
         return config["weights"]
@@ -1019,12 +1171,14 @@ def predict(config: dict[str, Any]) -> dict[str, Any]:
     today = dt.datetime.now().strftime("%Y-%m-%d")
     report: dict[str, Any] = {"date": today, "created_at": dt.datetime.now().isoformat(timespec="seconds"), "lotteries": {}}
     signals = fetch_17500_signals(config)
+    expert_signals = fetch_expert_signals(config)
     for key in config["lotteries"]:
         draws, source = collect_lottery(key, config)
         spec = LOTTERIES[key]
         weights = optimize_weights(draws, spec["digits"], config)
         signal = signals.get(key)
-        candidates = generate_candidates(draws, spec["digits"], int(config["candidate_count"]), weights, signal, config.get("model_weights"))
+        expert = expert_signals.get(key)
+        candidates = generate_candidates(draws, spec["digits"], int(config["candidate_count"]), weights, signal, expert, config.get("model_weights"))
         latest = draws[-1] if draws else None
         report["lotteries"][key] = {
             "name": spec["name"],
@@ -1037,6 +1191,7 @@ def predict(config: dict[str, Any]) -> dict[str, Any]:
             "model_weights": config.get("model_weights", DEFAULT_CONFIG["model_weights"]),
             "trend_summary": trend_summary(draws),
             "pre_draw_signals": signal_for_report(signal),
+            "expert_signals": expert_for_report(expert),
             "candidates": candidates,
             "top3": candidates[:3],
             "note": "随机开奖不可预测，本结果仅用于统计记录和复盘。",
@@ -1063,6 +1218,7 @@ def post_draw(config: dict[str, Any]) -> dict[str, Any]:
     previous = json.loads(prediction_path.read_text(encoding="utf-8")) if prediction_path.exists() else predict(config)
     review: dict[str, Any] = {"date": today, "created_at": dt.datetime.now().isoformat(timespec="seconds"), "results": {}}
     updated_config = dict(config)
+    expert_signals = fetch_expert_signals(config)
     for key in config["lotteries"]:
         draws, source = collect_lottery(key, config)
         spec = LOTTERIES[key]
@@ -1077,6 +1233,7 @@ def post_draw(config: dict[str, Any]) -> dict[str, Any]:
             "latest_date": latest.date,
             "latest_number": "".join(str(x) for x in latest.numbers),
             "evaluation": evaluation,
+            "expert_evaluation": evaluate_expert_signal(expert_signals.get(key), latest.numbers),
             "next_weights": optimized,
         }
         updated_config["weights"] = optimized
@@ -1179,6 +1336,7 @@ def write_markdown_report(report: dict[str, Any], path: Path) -> None:
                 f"- 最高评分 3 码：{top3_text}",
                 f"- 数据来源：{item['source']}",
                 f"- 开机/试机/关注码：{json.dumps(item.get('pre_draw_signals', {}), ensure_ascii=False)}",
+                f"- 专家/胆码/字谜弱信号：{json.dumps(item.get('expert_signals', {}), ensure_ascii=False)}",
                 f"- 历史期数：{item['history_count']}",
                 f"- 最新开奖：{item['latest_issue']} / {item['latest_date']} / {item['latest_number']}",
                 f"- 权重：{json.dumps(item['weights'], ensure_ascii=False)}",
@@ -1206,6 +1364,7 @@ def write_mobile_report(report: dict[str, Any], path: Path) -> None:
         )
         trend = html.escape(json.dumps(item.get("trend_summary", {}), ensure_ascii=False))
         pre_draw = html.escape(json.dumps(item.get("pre_draw_signals", {}), ensure_ascii=False))
+        expert_draw = html.escape(json.dumps(item.get("expert_signals", {}), ensure_ascii=False))
         models = html.escape(json.dumps({c["number"]: c.get("models", {}) for c in top3}, ensure_ascii=False))
         cards.append(
             f"""
@@ -1217,6 +1376,7 @@ def write_mobile_report(report: dict[str, Any], path: Path) -> None:
               <div class="latest">latest draw: {html.escape(str(item.get("latest_number", "")))}</div>
               <details><summary>model details</summary><pre>{models}</pre></details>
               <details><summary>machine/test/focus</summary><pre>{pre_draw}</pre></details>
+              <details><summary>expert/riddle weak signals</summary><pre>{expert_draw}</pre></details>
               <details><summary>trend summary</summary><pre>{trend}</pre></details>
             </section>
             """
