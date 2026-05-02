@@ -1134,6 +1134,84 @@ def evaluate_expert_signal(expert: dict[str, Any] | None, actual: tuple[int, ...
     }
 
 
+def evaluate_model_signals(candidates: list[dict[str, Any]], actual: tuple[int, ...]) -> dict[str, Any]:
+    if not candidates:
+        return {}
+    models = ["legacy", "markov", "bayes", "shape"]
+    result: dict[str, Any] = {}
+    actual_text = "".join(str(x) for x in actual)
+    for model in models:
+        ranked = sorted(
+            candidates,
+            key=lambda c: c.get("models", {}).get(model, -999999),
+            reverse=True,
+        )
+        top3 = ranked[:3]
+        best_hits = 0
+        exact_rank = None
+        for idx, candidate in enumerate(ranked[:10], start=1):
+            number = candidate["number"]
+            hits = sum(1 for a, b in zip(number, actual_text) if a == b)
+            best_hits = max(best_hits, hits)
+            if number == actual_text:
+                exact_rank = idx
+                break
+        result[model] = {
+            "top3": [c["number"] for c in top3],
+            "best_position_hits_top10": best_hits,
+            "exact_rank_top10": exact_rank,
+        }
+    return result
+
+
+def adapt_model_weights(config: dict[str, Any], review: dict[str, Any]) -> dict[str, float]:
+    current = dict(config.get("model_weights", DEFAULT_CONFIG["model_weights"]))
+    scores = {key: 0.0 for key in current}
+    for item in review.get("results", {}).values():
+        evaluations = item.get("model_evaluation", {})
+        digits = max(1, len(str(item.get("latest_number", ""))))
+        for model, model_result in evaluations.items():
+            hit_score = model_result.get("best_position_hits_top10", 0) / digits
+            exact_bonus = 0.55 if model_result.get("exact_rank_top10") else 0.0
+            scores[model] = scores.get(model, 0.0) + hit_score + exact_bonus
+
+    if not any(scores.values()):
+        return current
+
+    # Gentle online learning: move 8% toward the best-performing model mix.
+    total_score = sum(scores.values())
+    target = {key: max(0.08, scores.get(key, 0.0) / total_score) for key in current}
+    target_total = sum(target.values())
+    target = {key: value / target_total for key, value in target.items()}
+    updated = {key: 0.92 * current[key] + 0.08 * target[key] for key in current}
+    return normalize_weight_dict(updated)
+
+
+def adapt_expert_weight(config: dict[str, Any], review: dict[str, Any]) -> float:
+    current = float(config.get("expert_signal_weight", DEFAULT_CONFIG["expert_signal_weight"]))
+    score = 0.0
+    count = 0
+    for item in review.get("results", {}).values():
+        expert_eval = item.get("expert_evaluation") or {}
+        if not expert_eval:
+            continue
+        count += 1
+        score += 0.30 * len(expert_eval.get("banker_hits", []))
+        score += 0.12 * len(expert_eval.get("hot_hits", []))
+        score -= 0.22 * len(expert_eval.get("kill_misses_expected", []))
+    if count == 0:
+        return current
+    delta = max(-0.01, min(0.01, score / count * 0.01))
+    return round(max(0.02, min(0.16, current + delta)), 4)
+
+
+def normalize_weight_dict(weights: dict[str, float]) -> dict[str, float]:
+    total = sum(max(0.0, value) for value in weights.values())
+    if total <= 0:
+        return dict(DEFAULT_CONFIG["model_weights"])
+    return {key: round(max(0.0, value) / total, 4) for key, value in weights.items()}
+
+
 def optimize_weights(draws: list[Draw], digits: int, config: dict[str, Any]) -> dict[str, float]:
     if config.get("fast") or config.get("offline"):
         return config["weights"]
@@ -1226,6 +1304,7 @@ def post_draw(config: dict[str, Any]) -> dict[str, Any]:
         candidates = previous["lotteries"].get(key, {}).get("candidates", [])
         evaluation = evaluate_prediction(candidates, latest.numbers) if candidates else {}
         optimized = optimize_weights(draws, spec["digits"], config)
+        model_evaluation = evaluate_model_signals(candidates, latest.numbers)
         review["results"][key] = {
             "name": spec["name"],
             "source": source,
@@ -1233,10 +1312,19 @@ def post_draw(config: dict[str, Any]) -> dict[str, Any]:
             "latest_date": latest.date,
             "latest_number": "".join(str(x) for x in latest.numbers),
             "evaluation": evaluation,
+            "model_evaluation": model_evaluation,
             "expert_evaluation": evaluate_expert_signal(expert_signals.get(key), latest.numbers),
             "next_weights": optimized,
         }
         updated_config["weights"] = optimized
+    updated_config["model_weights"] = adapt_model_weights(config, review)
+    updated_config["expert_signal_weight"] = adapt_expert_weight(config, review)
+    review["iteration_update"] = {
+        "model_weights_before": config.get("model_weights", DEFAULT_CONFIG["model_weights"]),
+        "model_weights_after": updated_config["model_weights"],
+        "expert_signal_weight_before": config.get("expert_signal_weight", DEFAULT_CONFIG["expert_signal_weight"]),
+        "expert_signal_weight_after": updated_config["expert_signal_weight"],
+    }
     save_json(REPORT_DIR / f"post-draw-{today}.json", review)
     write_markdown_review(review, REPORT_DIR / f"post-draw-{today}.md")
     save_json(CONFIG_PATH, updated_config)
@@ -1446,6 +1534,14 @@ def write_mobile_report(report: dict[str, Any], path: Path) -> None:
 
 def write_markdown_review(review: dict[str, Any], path: Path) -> None:
     lines = [f"# 开奖后复盘 {review['date']}", "", "> 复盘用于调整下一次统计权重，不表示存在稳定预测能力。", ""]
+    if review.get("iteration_update"):
+        lines.extend(
+            [
+                "## 迭代更新",
+                f"- 模型权重：{json.dumps(review['iteration_update'], ensure_ascii=False)}",
+                "",
+            ]
+        )
     for item in review["results"].values():
         lines.extend(
             [
@@ -1453,6 +1549,8 @@ def write_markdown_review(review: dict[str, Any], path: Path) -> None:
                 f"- 数据来源：{item['source']}",
                 f"- 开奖：{item['latest_issue']} / {item['latest_date']} / {item['latest_number']}",
                 f"- 命中复盘：{json.dumps(item['evaluation'], ensure_ascii=False)}",
+                f"- 分模型复盘：{json.dumps(item.get('model_evaluation', {}), ensure_ascii=False)}",
+                f"- 专家弱信号复盘：{json.dumps(item.get('expert_evaluation', {}), ensure_ascii=False)}",
                 f"- 下一轮权重：{json.dumps(item['next_weights'], ensure_ascii=False)}",
                 "",
             ]
