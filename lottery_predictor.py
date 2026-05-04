@@ -42,6 +42,7 @@ DOCS_DIR = ROOT / "docs"
 CONFIG_PATH = ROOT / "config.json"
 WEB_REFRESH_LOCK = threading.Lock()
 LAST_WEB_REFRESH_AT: dt.datetime | None = None
+URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 LOTTERIES = {
@@ -122,6 +123,7 @@ DEFAULT_CONFIG = {
     "candidate_count": 20,
     "backtest_window": 60,
     "request_timeout_seconds": 8,
+    "expert_request_timeout_seconds": 5,
     "user_agent": "Mozilla/5.0 lottery-statistics-bot/1.0",
     "lotteries": ["fc3d", "pls", "plw"],
     "weights": {
@@ -266,7 +268,7 @@ def fetch_text(url: str, timeout: int, user_agent: str) -> str:
             "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with URL_OPENER.open(request, timeout=timeout) as response:
         raw = response.read()
         content_type = response.headers.get("Content-Type", "")
         encoding = "utf-8"
@@ -667,12 +669,44 @@ def log_position_prob(numbers: tuple[int, ...], probs: list[list[float]]) -> flo
     return sum(math.log(safe_prob(probs[pos][n])) for pos, n in enumerate(numbers))
 
 
-def ensemble_components(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None, expert: dict[str, Any] | None = None) -> dict[str, float]:
+def build_model_context(draws: list[Draw], digits: int) -> dict[str, Any]:
+    recent = draws[-80:] if len(draws) > 80 else draws
+    sums = [sum(d.numbers) for d in recent]
+    spans = [max(d.numbers) - min(d.numbers) for d in recent]
+    latest = recent[-1].numbers if recent else tuple([0] * digits)
+    deltas = [sum(abs(a - b) for a, b in zip(d.numbers, latest)) for d in recent[-20:]] if recent else [0]
+    return {
+        "bayes_probs": bayes_position_probs(draws, digits),
+        "markov_probs": markov_position_probs(draws, digits),
+        "shape": shape_model(draws),
+        "sum_mean": mean(sums) if sums else 0,
+        "sum_sd": stddev(sums) if sums else 1,
+        "span_mean": mean(spans) if spans else 0,
+        "span_sd": stddev(spans) if spans else 1,
+        "odd_counts": top_count_dict([sum(1 for n in d.numbers if n % 2 == 1) for d in recent]),
+        "big_counts": top_count_dict([sum(1 for n in d.numbers if n >= 5) for d in recent]),
+        "sum_tails": top_count_dict([sum(d.numbers) % 10 for d in recent]),
+        "mod3_counts": top_count_dict([tuple(sum(1 for n in d.numbers if n % 3 == m) for m in range(3)) for d in recent]),
+        "delta_mean": mean(deltas),
+        "delta_sd": max(stddev(deltas), 1.0),
+        "latest": latest,
+    }
+
+
+def top_count_dict(values: list[Any]) -> dict[Any, int]:
+    counts: dict[Any, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def ensemble_components(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None, expert: dict[str, Any] | None = None, context: dict[str, Any] | None = None) -> dict[str, float]:
     digits = len(numbers)
-    bayes_probs = bayes_position_probs(draws, digits)
-    markov_probs = markov_position_probs(draws, digits)
-    shape = shape_model(draws)
-    legacy = candidate_score(numbers, stats, draws, signal, expert)
+    context = context or build_model_context(draws, digits)
+    bayes_probs = context["bayes_probs"]
+    markov_probs = context["markov_probs"]
+    shape = context["shape"]
+    legacy = candidate_score(numbers, stats, draws, signal, expert, context)
     markov = log_position_prob(numbers, markov_probs)
     bayes = log_position_prob(numbers, bayes_probs)
     shape_score = math.log(safe_prob(shape_probability(numbers, shape)))
@@ -694,20 +728,55 @@ def ensemble_score(components: dict[str, float], model_weights: dict[str, float]
     return total / max(weight_sum, 1e-9)
 
 
-def candidate_score(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None, expert: dict[str, Any] | None = None) -> float:
+def optimize_model_weights_for_draws(draws: list[Draw], digits: int, config: dict[str, Any]) -> dict[str, float]:
+    """Estimate model reliability from recent walk-forward log scores.
+
+    This is deliberately lightweight so the cloud job can run often. It scores
+    the actually drawn number under each model at each historical cutoff; models
+    that assigned higher probability to real outcomes receive more weight.
+    """
+    current = dict(config.get("model_weights", DEFAULT_CONFIG["model_weights"]))
+    if len(draws) < 12:
+        return current
+
+    start = max(8, len(draws) - int(config.get("backtest_window", 60)))
+    totals = {key: 0.0 for key in current}
+    counts = 0
+    for idx in range(start, len(draws)):
+        history = draws[:idx]
+        actual = draws[idx].numbers
+        stats = position_stats(history, digits, config["weights"])
+        components = ensemble_components(actual, stats, history)
+        for key in totals:
+            # Normalize by digit count so 5-digit games do not drown 3-digit games.
+            totals[key] += components.get(key, -20.0) / max(1, digits)
+        counts += 1
+
+    if counts == 0:
+        return current
+
+    averages = {key: totals[key] / counts for key in totals}
+    best = max(averages.values())
+    # Softmax over recent log-likelihoods. Temperature keeps the movement sane.
+    exp_scores = {key: math.exp((value - best) / 0.7) for key, value in averages.items()}
+    exp_total = sum(exp_scores.values())
+    evidence = {key: exp_scores[key] / exp_total for key in exp_scores}
+    blended = {key: 0.65 * current[key] + 0.35 * evidence[key] for key in current}
+    return normalize_weight_dict(blended)
+
+
+def candidate_score(numbers: tuple[int, ...], stats: list[list[float]], draws: list[Draw], signal: dict[str, Any] | None = None, expert: dict[str, Any] | None = None, context: dict[str, Any] | None = None) -> float:
     score = 0.0
     for pos, n in enumerate(numbers):
         score += math.log(stats[pos][n] + 1e-9)
 
     digit_sum = sum(numbers)
     span = max(numbers) - min(numbers)
-    recent = draws[-80:] if len(draws) > 80 else draws
-    if recent:
-        sums = [sum(d.numbers) for d in recent]
-        spans = [max(d.numbers) - min(d.numbers) for d in recent]
-        score += gaussian_bonus(digit_sum, mean(sums), stddev(sums))
-        score += 0.6 * gaussian_bonus(span, mean(spans), stddev(spans))
-        score += trend_shape_bonus(numbers, recent)
+    if draws:
+        context = context or build_model_context(draws, len(numbers))
+        score += gaussian_bonus(digit_sum, context["sum_mean"], context["sum_sd"])
+        score += 0.6 * gaussian_bonus(span, context["span_mean"], context["span_sd"])
+        score += trend_shape_bonus_fast(numbers, context)
     if signal:
         score += signal_bonus(numbers, signal)
     if expert:
@@ -802,6 +871,29 @@ def trend_shape_bonus(numbers: tuple[int, ...], recent: list[Draw]) -> float:
     return bonus
 
 
+def trend_shape_bonus_fast(numbers: tuple[int, ...], context: dict[str, Any]) -> float:
+    odd_count = sum(1 for n in numbers if n % 2 == 1)
+    big_count = sum(1 for n in numbers if n >= 5)
+    sum_tail = sum(numbers) % 10
+    mod3_counts = tuple(sum(1 for n in numbers if n % 3 == m) for m in range(3))
+    bonus = 0.0
+    bonus += 0.35 * categorical_bonus_from_counts(odd_count, context["odd_counts"])
+    bonus += 0.35 * categorical_bonus_from_counts(big_count, context["big_counts"])
+    bonus += 0.25 * categorical_bonus_from_counts(sum_tail, context["sum_tails"])
+    bonus += 0.25 * categorical_bonus_from_counts(mod3_counts, context["mod3_counts"])
+    latest_delta = sum(abs(a - b) for a, b in zip(numbers, context["latest"]))
+    bonus += 0.15 * gaussian_bonus(latest_delta, context["delta_mean"], context["delta_sd"])
+    return bonus
+
+
+def categorical_bonus_from_counts(value: Any, counts: dict[Any, int]) -> float:
+    if not counts:
+        return 0.0
+    total = sum(counts.values())
+    rate = counts.get(value, 0) / max(1, total)
+    return math.log(rate + 0.05)
+
+
 def categorical_bonus(value: Any, samples: list[Any]) -> float:
     if not samples:
         return 0.0
@@ -867,7 +959,11 @@ def fetch_expert_signals(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
         }
         for source in sources:
             try:
-                text = fetch_text(source["url"], int(config["request_timeout_seconds"]), config["user_agent"])
+                timeout = min(
+                    int(config.get("expert_request_timeout_seconds", 5)),
+                    int(config.get("request_timeout_seconds", 8)),
+                )
+                text = fetch_text(source["url"], timeout, config["user_agent"])
             except (urllib.error.URLError, TimeoutError, UnicodeDecodeError, KeyError):
                 continue
             parsed = parse_expert_text(text)
@@ -1022,9 +1118,10 @@ def generate_candidates(
     stats = position_stats(draws, digits, weights)
     model_weights = model_weights or DEFAULT_CONFIG["model_weights"]
     all_numbers = candidate_pool(stats, digits, draws)
+    context = build_model_context(draws, digits)
     scored = []
     for numbers in all_numbers:
-        components = ensemble_components(numbers, stats, draws, signal, expert)
+        components = ensemble_components(numbers, stats, draws, signal, expert, context)
         scored.append((ensemble_score(components, model_weights), numbers, components))
     scored.sort(reverse=True, key=lambda x: x[0])
     top = scored[: max(count * 5, count)]
@@ -1256,7 +1353,8 @@ def predict(config: dict[str, Any]) -> dict[str, Any]:
         weights = optimize_weights(draws, spec["digits"], config)
         signal = signals.get(key)
         expert = expert_signals.get(key)
-        candidates = generate_candidates(draws, spec["digits"], int(config["candidate_count"]), weights, signal, expert, config.get("model_weights"))
+        model_weights = optimize_model_weights_for_draws(draws, spec["digits"], config)
+        candidates = generate_candidates(draws, spec["digits"], int(config["candidate_count"]), weights, signal, expert, model_weights)
         latest = draws[-1] if draws else None
         report["lotteries"][key] = {
             "name": spec["name"],
@@ -1266,7 +1364,7 @@ def predict(config: dict[str, Any]) -> dict[str, Any]:
             "latest_date": latest.date if latest else None,
             "latest_number": "".join(str(x) for x in latest.numbers) if latest else None,
             "weights": weights,
-            "model_weights": config.get("model_weights", DEFAULT_CONFIG["model_weights"]),
+            "model_weights": model_weights,
             "trend_summary": trend_summary(draws),
             "pre_draw_signals": signal_for_report(signal),
             "expert_signals": expert_for_report(expert),
@@ -1371,7 +1469,7 @@ def cloud_update(config: dict[str, Any]) -> dict[str, Any]:
     now = dt.datetime.now()
     did_review = False
     review_at = scheduled_datetime(now.date(), config["post_draw_time"])
-    if now >= review_at:
+    if now >= review_at and should_run_cloud_review(now.date()):
         try:
             post_draw(config)
             did_review = True
@@ -1388,6 +1486,23 @@ def cloud_update(config: dict[str, Any]) -> dict[str, Any]:
         },
     )
     return report
+
+
+def should_run_cloud_review(day: dt.date) -> bool:
+    path = REPORT_DIR / f"post-draw-{day.strftime('%Y-%m-%d')}.json"
+    if not path.exists():
+        return True
+    try:
+        review = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return True
+    today_text = day.isoformat()
+    for item in review.get("results", {}).values():
+        latest_date = str(item.get("latest_date", ""))
+        if latest_date >= today_text:
+            return False
+    # Results may not have been published yet; retry on the next scheduled run.
+    return True
 
 
 def write_error_status(action: str, exc: Exception) -> None:

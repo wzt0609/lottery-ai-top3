@@ -3,9 +3,9 @@ name: Lottery Cloud Update
 on:
   workflow_dispatch:
   schedule:
-    # Runs every 30 minutes. The Python script decides whether to publish
+    # Runs every 10 minutes. The Python script decides whether to publish
     # prediction-only or post-draw review + prediction based on Beijing time.
-    - cron: "*/30 * * * *"
+    - cron: "*/10 * * * *"
 
 permissions:
   contents: write

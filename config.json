@@ -5,7 +5,8 @@
   "history_limit": 220,
   "candidate_count": 20,
   "backtest_window": 60,
-  "request_timeout_seconds": 15,
+  "request_timeout_seconds": 8,
+  "expert_request_timeout_seconds": 5,
   "user_agent": "Mozilla/5.0 lottery-statistics-bot/1.0",
   "lotteries": [
     "fc3d",
@@ -19,13 +20,13 @@
     "transition": 0.16
   },
   "model_weights": {
-    "legacy": 0.2934,
-    "markov": 0.2934,
-    "bayes": 0.2467,
-    "shape": 0.1665
+    "legacy": 0.2907,
+    "markov": 0.2907,
+    "bayes": 0.2443,
+    "shape": 0.1744
   },
   "signal_weight": 0.18,
-  "expert_signal_weight": 0.062,
+  "expert_signal_weight": 0.064,
   "expert_sources": {
     "fc3d": [
       {
