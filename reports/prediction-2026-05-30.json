@@ -1,6 +1,6 @@
 {
   "date": "2026-05-30",
-  "created_at": "2026-05-30T01:46:46",
+  "created_at": "2026-05-30T03:58:03",
   "lotteries": {
     "fc3d": {
       "name": "中国福利彩票 3D",
@@ -67,21 +67,18 @@
           2,
           3,
           5,
-          6,
-          9
+          6
         ],
         "hot_digits": [],
         "kill_digits": [
           0,
+          1,
           2,
+          3,
           5,
           6
         ],
         "sum_ranges": [
-          [
-            4,
-            26
-          ],
           [
             5,
             26
@@ -146,11 +143,11 @@
         {
           "rank": 4,
           "number": "581",
-          "score": -5.466997,
+          "score": -5.472961,
           "sum": 14,
           "span": 7,
           "models": {
-            "legacy": -6.9661,
+            "legacy": -6.9974,
             "markov": -6.9027,
             "bayes": -6.2481,
             "shape": -3.4511
@@ -211,11 +208,11 @@
         {
           "rank": 9,
           "number": "683",
-          "score": -5.357628,
+          "score": -5.363592,
           "sum": 17,
           "span": 5,
           "models": {
-            "legacy": -7.0608,
+            "legacy": -7.0921,
             "markov": -5.8053,
             "bayes": -6.5321,
             "shape": -3.6138
@@ -224,11 +221,11 @@
         {
           "rank": 10,
           "number": "510",
-          "score": -5.388619,
+          "score": -5.394583,
           "sum": 6,
           "span": 5,
           "models": {
-            "legacy": -7.1004,
+            "legacy": -7.1317,
             "markov": -5.6422,
             "bayes": -6.011,
             "shape": -4.0499
@@ -302,11 +299,11 @@
         {
           "rank": 16,
           "number": "283",
-          "score": -5.431424,
+          "score": -5.437388,
           "sum": 13,
           "span": 6,
           "models": {
-            "legacy": -7.1418,
+            "legacy": -7.1731,
             "markov": -5.8053,
             "bayes": -6.4548,
             "shape": -3.8083
@@ -315,11 +312,11 @@
         {
           "rank": 17,
           "number": "583",
-          "score": -5.432327,
+          "score": -5.43829,
           "sum": 16,
           "span": 5,
           "models": {
-            "legacy": -6.7189,
+            "legacy": -6.7501,
             "markov": -5.8053,
             "bayes": -6.4031,
             "shape": -4.0499
@@ -410,7 +407,7 @@
     },
     "pls": {
       "name": "中国体育彩票 排列三",
-      "source": "https://touch.17500.cn/award/history/lotid/pl3.html",
+      "source": "local-cache",
       "history_count": 49,
       "latest_issue": "2026139",
       "latest_date": "2026-05-29",
@@ -766,7 +763,7 @@
     },
     "plw": {
       "name": "中国体育彩票 排列五",
-      "source": "https://touch.17500.cn/award/history/lotid/pl5.html",
+      "source": "local-cache",
       "history_count": 49,
       "latest_issue": "2026139",
       "latest_date": "2026-05-29",
