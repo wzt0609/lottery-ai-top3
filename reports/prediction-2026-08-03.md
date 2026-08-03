@@ -5,7 +5,7 @@
 ## 中国福利彩票 3D
 - 最高评分 3 码：425、616、925
 - 数据来源：https://touch.17500.cn/award/history/lotid/3d.html
-- 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "204", "draw_number": "205", "machine_number": "876", "test_number": "030", "focus_number": "548"}
+- 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "205", "draw_number": "205", "machine_number": "876", "test_number": "030", "focus_number": "548"}
 - 专家/胆码/字谜弱信号：{"source_names": ["17500 钱王点评", "17500 孟庆会一语定胆"], "source_urls": ["https://www.17500.cn/search/457.html", "https://www.17500.cn/search/921.html"], "banker_digits": [0, 1, 2, 3, 4, 6, 7, 8], "hot_digits": [1, 3, 7], "kill_digits": [0, 2, 6, 8], "sum_ranges": [[7, 26]], "span_values": [0, 1, 3, 5, 7], "snippets": ["字谜 学习彩票 彩皇网 足球 福彩3D 双色球 快乐8 七乐彩 排列3 排列5 大乐透 7星彩 全国彩票 六省联销 福彩15选5 东方6+1 上海 上海15选5 上", "字谜] 福彩3D第2026188期黑胆王中奖迷 黑胆王中奖迷 188期福彩3d黑胆王中奖迷：戏台唱曲袖边尘 187期福彩3d黑胆王中奖迷：打腰鼓咚咚震地 开：0 2", "和值：5 186期福 ... 2026-07-16 22:31 [3D字谜] 福彩3D第2026187期黑胆王中奖迷 黑胆王中奖迷 187期福彩3d黑胆王中奖迷：打", "字谜_乐彩网 [登录/注册] 手机乐彩网 扫码|点击 访问手机乐彩网 乐彩网APP 扫码下载乐彩网安卓APP 下载 查看 网站地图 联系客服 在线客服 400801", "字谜 学习彩票 彩皇网 足球 福彩3D 双色球 快乐8 七乐彩 排列3 排列5 大乐透 7星彩 全国彩票 六省联销 福彩15选5 东方6+1 上海 上海15选5 上"], "weight": 0.1147}
 - 历史期数：114
 - 最新开奖：2026204 / 2026-08-02 / 978
@@ -39,7 +39,7 @@
 ## 中国体育彩票 排列三
 - 最高评分 3 码：056、053、355
 - 数据来源：https://touch.17500.cn/award/history/lotid/pl3.html
-- 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "204", "draw_number": "205", "machine_number": "876", "test_number": "030", "focus_number": "548"}
+- 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "205", "draw_number": "205", "machine_number": "876", "test_number": "030", "focus_number": "548"}
 - 专家/胆码/字谜弱信号：{}
 - 历史期数：114
 - 最新开奖：2026204 / 2026-08-02 / 674
@@ -73,7 +73,7 @@
 ## 中国体育彩票 排列五
 - 最高评分 3 码：05670、05360、35570
 - 数据来源：https://touch.17500.cn/award/history/lotid/pl5.html
-- 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "204", "machine_number": "87620", "test_number": "03020", "focus_number": "54820"}
+- 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "205", "machine_number": "87620", "test_number": "03020", "focus_number": "54820"}
 - 专家/胆码/字谜弱信号：{"source_names": ["17500 排列五专家杀码"], "source_urls": ["https://www.17500.cn/search/?wd=%E6%8E%92%E5%88%97%E4%BA%94%20%E6%9D%80%E4%B8%80%E7%A0%81"], "banker_digits": [], "hot_digits": [], "kill_digits": [], "sum_ranges": [], "span_values": [], "snippets": ["字谜 学习彩票 彩皇网 足球 福彩3D 双色球 快乐8 七乐彩 排列3 排列5 大乐透 7星彩 全国彩票 六省联销 福彩15选5 东方6+1 上海 上海15选5 上", "字谜 图谜 条件 廊坊鸿运 949499 2.00元 阿郎赫赫哩呐 爱心角落 白鱼舟 铂金彩D 彩多星 重庆陈哥 潮人永恒22 大光光 带子入朝 福娃债主 奉旨拿奖", "和值预测 和尾预测 跨度预测 胆码预测 定位分析 号码预测 投注技巧 推荐 专家杀号 机选 选号 于海滨杀码 钱王点评 詹天佑点评 开奖号 胆拖 复式玩法 开奖信息"], "weight": 0.1147}
 - 历史期数：114
 - 最新开奖：2026204 / 2026-08-02 / 67407
