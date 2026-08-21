@@ -1,6 +1,6 @@
 {
   "date": "2026-08-21",
-  "created_at": "2026-08-21T11:10:29",
+  "created_at": "2026-08-21T12:05:51",
   "lotteries": {
     "fc3d": {
       "name": "中国福利彩票 3D",
@@ -67,8 +67,7 @@
           2,
           3,
           6,
-          8,
-          9
+          8
         ],
         "hot_digits": [
           1,
@@ -82,6 +81,10 @@
           8
         ],
         "sum_ranges": [
+          [
+            0,
+            26
+          ],
           [
             7,
             26
@@ -137,11 +140,11 @@
         {
           "rank": 3,
           "number": "925",
-          "score": -5.713153,
+          "score": -5.722317,
           "sum": 16,
           "span": 7,
           "models": {
-            "legacy": -7.586,
+            "legacy": -7.6429,
             "markov": -7.8973,
             "bayes": -5.3896,
             "shape": -4.0344
@@ -150,11 +153,11 @@
         {
           "rank": 4,
           "number": "937",
-          "score": -5.922629,
+          "score": -5.931792,
           "sum": 19,
           "span": 6,
           "models": {
-            "legacy": -8.7469,
+            "legacy": -8.8037,
             "markov": -7.3542,
             "bayes": -6.679,
             "shape": -3.5688
@@ -399,11 +402,11 @@
         {
           "rank": 3,
           "number": "925",
-          "score": -5.713153,
+          "score": -5.722317,
           "sum": 16,
           "span": 7,
           "models": {
-            "legacy": -7.586,
+            "legacy": -7.6429,
             "markov": -7.8973,
             "bayes": -5.3896,
             "shape": -4.0344
@@ -414,7 +417,7 @@
     },
     "pls": {
       "name": "中国体育彩票 排列三",
-      "source": "https://touch.17500.cn/award/history/lotid/pl3.html",
+      "source": "local-cache",
       "history_count": 132,
       "latest_issue": "2026222",
       "latest_date": "2026-08-20",
@@ -770,7 +773,7 @@
     },
     "plw": {
       "name": "中国体育彩票 排列五",
-      "source": "https://touch.17500.cn/award/history/lotid/pl5.html",
+      "source": "local-cache",
       "history_count": 132,
       "latest_issue": "2026222",
       "latest_date": "2026-08-20",
