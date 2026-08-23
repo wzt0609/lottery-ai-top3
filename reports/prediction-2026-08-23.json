@@ -1,6 +1,6 @@
 {
   "date": "2026-08-23",
-  "created_at": "2026-08-23T11:10:40",
+  "created_at": "2026-08-23T12:05:47",
   "lotteries": {
     "fc3d": {
       "name": "中国福利彩票 3D",
@@ -76,9 +76,7 @@
         ],
         "kill_digits": [
           0,
-          1,
           2,
-          4,
           6,
           8
         ],
@@ -285,11 +283,11 @@
         {
           "rank": 14,
           "number": "425",
-          "score": -5.466718,
+          "score": -5.458181,
           "sum": 11,
           "span": 3,
           "models": {
-            "legacy": -7.0605,
+            "legacy": -7.0074,
             "markov": -6.552,
             "bayes": -5.8453,
             "shape": -4.0225
@@ -310,6 +308,19 @@
         },
         {
           "rank": 16,
+          "number": "485",
+          "score": -5.49239,
+          "sum": 17,
+          "span": 4,
+          "models": {
+            "legacy": -6.6656,
+            "markov": -6.021,
+            "bayes": -5.9791,
+            "shape": -4.4381
+          }
+        },
+        {
+          "rank": 17,
           "number": "522",
           "score": -5.49897,
           "sum": 9,
@@ -319,19 +330,6 @@
             "markov": -6.4927,
             "bayes": -6.0629,
             "shape": -4.2088
-          }
-        },
-        {
-          "rank": 17,
-          "number": "485",
-          "score": -5.500928,
-          "sum": 17,
-          "span": 4,
-          "models": {
-            "legacy": -6.7187,
-            "markov": -6.021,
-            "bayes": -5.9791,
-            "shape": -4.4381
           }
         },
         {
@@ -363,11 +361,11 @@
         {
           "rank": 20,
           "number": "915",
-          "score": -5.537696,
+          "score": -5.529159,
           "sum": 15,
           "span": 8,
           "models": {
-            "legacy": -7.7228,
+            "legacy": -7.6697,
             "markov": -6.2439,
             "bayes": -5.6544,
             "shape": -4.2088
