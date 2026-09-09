@@ -38,7 +38,7 @@
 
 ## 中国体育彩票 排列三
 - 最高评分 3 码：361、354、970
-- 数据来源：local-cache
+- 数据来源：https://touch.17500.cn/award/history/lotid/pl3.html
 - 开机/试机/关注码：{"source": "https://www.17500.cn/", "issue_hint": "241", "draw_number": "242", "machine_number": "955", "test_number": "597", "focus_number": "065"}
 - 专家/胆码/字谜弱信号：{}
 - 历史期数：151
