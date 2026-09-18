@@ -16,17 +16,17 @@
   "weights": {
     "frequency": 0.3,
     "recency": 0.24,
-    "omission": 0.32,
-    "transition": 0.14
+    "omission": 0.18,
+    "transition": 0.28
   },
   "model_weights": {
-    "legacy": 0.2218,
-    "markov": 0.2085,
-    "bayes": 0.2915,
-    "shape": 0.2782
+    "legacy": 0.2142,
+    "markov": 0.2083,
+    "bayes": 0.2948,
+    "shape": 0.2826
   },
   "signal_weight": 0.18,
-  "expert_signal_weight": 0.1293,
+  "expert_signal_weight": 0.1297,
   "expert_sources": {
     "fc3d": [
       {
