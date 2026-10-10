@@ -14,19 +14,19 @@
     "plw"
   ],
   "weights": {
-    "frequency": 0.3,
-    "recency": 0.24,
-    "omission": 0.18,
-    "transition": 0.28
+    "frequency": 0.28,
+    "recency": 0.36,
+    "omission": 0.22,
+    "transition": 0.14
   },
   "model_weights": {
-    "legacy": 0.2299,
-    "markov": 0.204,
-    "bayes": 0.2835,
-    "shape": 0.2826
+    "legacy": 0.2325,
+    "markov": 0.2047,
+    "bayes": 0.2818,
+    "shape": 0.281
   },
   "signal_weight": 0.18,
-  "expert_signal_weight": 0.1303,
+  "expert_signal_weight": 0.1307,
   "expert_sources": {
     "fc3d": [
       {
