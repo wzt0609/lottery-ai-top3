@@ -1,51 +1,51 @@
 {
-  "date": "2026-11-09",
-  "created_at": "2026-11-09T23:58:40",
+  "date": "2026-11-10",
+  "created_at": "2026-11-10T23:47:04",
   "results": {
     "fc3d": {
       "name": "中国福利彩票 3D",
       "source": "https://touch.17500.cn/award/history/lotid/3d.html",
-      "latest_issue": "2026298",
-      "latest_date": "2026-11-08",
-      "latest_number": "085",
+      "latest_issue": "2026299",
+      "latest_date": "2026-11-09",
+      "latest_number": "382",
       "evaluation": {
-        "actual": "085",
-        "best_position_hits": 1,
+        "actual": "382",
+        "best_position_hits": 2,
         "exact_rank": null
       },
       "model_evaluation": {
         "legacy": {
           "top3": [
             "832",
-            "932",
-            "982"
+            "882",
+            "932"
           ],
-          "best_position_hits_top10": 1,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         },
         "markov": {
           "top3": [
-            "931",
-            "939",
-            "932"
+            "815",
+            "269",
+            "285"
           ],
-          "best_position_hits_top10": 0,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         },
         "bayes": {
           "top3": [
             "981",
             "982",
-            "681"
+            "881"
           ],
-          "best_position_hits_top10": 1,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         },
         "shape": {
           "top3": [
-            "969",
-            "912",
-            "851"
+            "962",
+            "692",
+            "269"
           ],
           "best_position_hits_top10": 1,
           "exact_rank_top10": null
@@ -53,13 +53,16 @@
       },
       "expert_evaluation": {
         "banker_hits": [
-          0
+          2,
+          3
         ],
-        "hot_hits": [],
+        "hot_hits": [
+          3
+        ],
         "kill_misses_expected": [
-          0
+          2
         ],
-        "actual": "085",
+        "actual": "382",
         "source_names": [
           "17500 钱王点评",
           "17500 孟庆会一语定胆"
@@ -75,11 +78,11 @@
     "pls": {
       "name": "中国体育彩票 排列三",
       "source": "https://touch.17500.cn/award/history/lotid/pl3.html",
-      "latest_issue": "2026298",
-      "latest_date": "2026-11-08",
-      "latest_number": "597",
+      "latest_issue": "2026299",
+      "latest_date": "2026-11-09",
+      "latest_number": "170",
       "evaluation": {
-        "actual": "597",
+        "actual": "170",
         "best_position_hits": 1,
         "exact_rank": null
       },
@@ -88,16 +91,16 @@
           "top3": [
             "273",
             "263",
-            "293"
+            "271"
           ],
           "best_position_hits_top10": 1,
           "exact_rank_top10": null
         },
         "markov": {
           "top3": [
-            "253",
-            "293",
-            "093"
+            "823",
+            "873",
+            "263"
           ],
           "best_position_hits_top10": 1,
           "exact_rank_top10": null
@@ -105,8 +108,8 @@
         "bayes": {
           "top3": [
             "271",
-            "276",
-            "273"
+            "277",
+            "276"
           ],
           "best_position_hits_top10": 1,
           "exact_rank_top10": null
@@ -114,8 +117,8 @@
         "shape": {
           "top3": [
             "613",
-            "163",
-            "451"
+            "361",
+            "163"
           ],
           "best_position_hits_top10": 1,
           "exact_rank_top10": null
@@ -132,49 +135,49 @@
     "plw": {
       "name": "中国体育彩票 排列五",
       "source": "https://touch.17500.cn/award/history/lotid/pl5.html",
-      "latest_issue": "2026298",
-      "latest_date": "2026-11-08",
-      "latest_number": "59708",
+      "latest_issue": "2026299",
+      "latest_date": "2026-11-09",
+      "latest_number": "17029",
       "evaluation": {
-        "actual": "59708",
-        "best_position_hits": 1,
+        "actual": "17029",
+        "best_position_hits": 2,
         "exact_rank": null
       },
       "model_evaluation": {
         "legacy": {
           "top3": [
-            "27361",
-            "29261",
-            "29362"
+            "27371",
+            "26370",
+            "27173"
           ],
-          "best_position_hits_top10": 1,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         },
         "markov": {
           "top3": [
-            "25365",
-            "29362",
-            "22369"
+            "82371",
+            "36371",
+            "25471"
           ],
-          "best_position_hits_top10": 1,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         },
         "bayes": {
           "top3": [
             "27141",
-            "29341",
-            "29142"
+            "27740",
+            "29341"
           ],
-          "best_position_hits_top10": 1,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         },
         "shape": {
           "top3": [
-            "27361",
-            "29165",
-            "27163"
+            "27371",
+            "27173",
+            "67321"
           ],
-          "best_position_hits_top10": 1,
+          "best_position_hits_top10": 2,
           "exact_rank_top10": null
         }
       },
@@ -182,7 +185,7 @@
         "banker_hits": [],
         "hot_hits": [],
         "kill_misses_expected": [],
-        "actual": "59708",
+        "actual": "17029",
         "source_names": [
           "17500 排列五专家杀码"
         ]
@@ -197,18 +200,18 @@
   },
   "iteration_update": {
     "model_weights_before": {
-      "legacy": 0.2315,
-      "markov": 0.2091,
-      "bayes": 0.2766,
-      "shape": 0.2828
-    },
-    "model_weights_after": {
       "legacy": 0.2351,
       "markov": 0.206,
       "bayes": 0.2766,
       "shape": 0.2823
     },
-    "expert_signal_weight_before": 0.1348,
-    "expert_signal_weight_after": 0.1352
+    "model_weights_after": {
+      "legacy": 0.2376,
+      "markov": 0.2108,
+      "bayes": 0.2757,
+      "shape": 0.2759
+    },
+    "expert_signal_weight_before": 0.1352,
+    "expert_signal_weight_after": 0.1377
   }
 }
