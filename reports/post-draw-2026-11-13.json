@@ -1,0 +1,214 @@
+{
+  "date": "2026-11-13",
+  "created_at": "2026-11-13T23:30:57",
+  "results": {
+    "fc3d": {
+      "name": "中国福利彩票 3D",
+      "source": "https://touch.17500.cn/award/history/lotid/3d.html",
+      "latest_issue": "2026302",
+      "latest_date": "2026-11-12",
+      "latest_number": "428",
+      "evaluation": {
+        "actual": "428",
+        "best_position_hits": 0,
+        "exact_rank": null
+      },
+      "model_evaluation": {
+        "legacy": {
+          "top3": [
+            "682",
+            "681",
+            "882"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "markov": {
+          "top3": [
+            "666",
+            "686",
+            "586"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "bayes": {
+          "top3": [
+            "181",
+            "881",
+            "981"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "shape": {
+          "top3": [
+            "581",
+            "185",
+            "916"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        }
+      },
+      "expert_evaluation": {
+        "banker_hits": [
+          2
+        ],
+        "hot_hits": [],
+        "kill_misses_expected": [
+          2
+        ],
+        "actual": "428",
+        "source_names": [
+          "17500 钱王点评",
+          "17500 孟庆会一语定胆"
+        ]
+      },
+      "next_weights": {
+        "frequency": 0.42,
+        "recency": 0.24,
+        "omission": 0.2,
+        "transition": 0.14
+      }
+    },
+    "pls": {
+      "name": "中国体育彩票 排列三",
+      "source": "https://touch.17500.cn/award/history/lotid/pl3.html",
+      "latest_issue": "2026302",
+      "latest_date": "2026-11-12",
+      "latest_number": "982",
+      "evaluation": {
+        "actual": "982",
+        "best_position_hits": 0,
+        "exact_rank": null
+      },
+      "model_evaluation": {
+        "legacy": {
+          "top3": [
+            "273",
+            "263",
+            "271"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "markov": {
+          "top3": [
+            "163",
+            "173",
+            "154"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "bayes": {
+          "top3": [
+            "271",
+            "291",
+            "276"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "shape": {
+          "top3": [
+            "163",
+            "613",
+            "145"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        }
+      },
+      "expert_evaluation": {},
+      "next_weights": {
+        "frequency": 0.3,
+        "recency": 0.24,
+        "omission": 0.32,
+        "transition": 0.14
+      }
+    },
+    "plw": {
+      "name": "中国体育彩票 排列五",
+      "source": "https://touch.17500.cn/award/history/lotid/pl5.html",
+      "latest_issue": "2026302",
+      "latest_date": "2026-11-12",
+      "latest_number": "98292",
+      "evaluation": {
+        "actual": "98292",
+        "best_position_hits": 1,
+        "exact_rank": null
+      },
+      "model_evaluation": {
+        "legacy": {
+          "top3": [
+            "27340",
+            "27620",
+            "27921"
+          ],
+          "best_position_hits_top10": 1,
+          "exact_rank_top10": null
+        },
+        "markov": {
+          "top3": [
+            "16323",
+            "16921",
+            "96321"
+          ],
+          "best_position_hits_top10": 1,
+          "exact_rank_top10": null
+        },
+        "bayes": {
+          "top3": [
+            "27141",
+            "27340",
+            "27321"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        },
+        "shape": {
+          "top3": [
+            "27921",
+            "17623",
+            "17326"
+          ],
+          "best_position_hits_top10": 0,
+          "exact_rank_top10": null
+        }
+      },
+      "expert_evaluation": {
+        "banker_hits": [],
+        "hot_hits": [],
+        "kill_misses_expected": [],
+        "actual": "98292",
+        "source_names": [
+          "17500 排列五专家杀码"
+        ]
+      },
+      "next_weights": {
+        "frequency": 0.42,
+        "recency": 0.24,
+        "omission": 0.2,
+        "transition": 0.14
+      }
+    }
+  },
+  "iteration_update": {
+    "model_weights_before": {
+      "legacy": 0.2376,
+      "markov": 0.2108,
+      "bayes": 0.2757,
+      "shape": 0.2759
+    },
+    "model_weights_after": {
+      "legacy": 0.2531,
+      "markov": 0.2284,
+      "bayes": 0.2592,
+      "shape": 0.2593
+    },
+    "expert_signal_weight_before": 0.1377,
+    "expert_signal_weight_after": 0.1381
+  }
+}
